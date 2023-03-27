@@ -185,6 +185,44 @@ namespace XBMCAddon
       XBMC_TRACE;
       std::string lang = g_langInfo.GetEnglishLanguageName();
 
+      //g_langInfo.GetLocale().ToString(); returns 'en_AU'
+      //g_langInfo.GetLanguageCode(); returns 'eng'
+      //g_langInfo.GetRegionLocale(); returns 'AU'
+      //g_LangCodeExpander.ConvertToISO6391('eng' in, 'en' out);
+      //g_LangCodeExpander.Lookup('eng' in , 'English' out);
+      //g_LangCodeExpander.LookupISO31661('AU' in , 'Australia' out, false);
+      //g_LangCodeExpander.LookupISO31661('AU' in, 'AUS' out, true);
+      
+      //std::string langLocale = g_langInfo.GetLocale().ToShortString();
+      //CLog::Log(LOGINFO, StringUtils::Format("getLanguage {} {} {} {}", format, region, lang, langLocale));
+      //std::string dmc1 = g_langInfo.GetLocale().ToString();  //5 character hybrid
+      //std::string dmc2 = g_langInfo.GetLanguageCode();  //3 character language code 'eng'
+      //std::string dmc3 = g_langInfo.GetRegionLocale();  //2 character region code 'AU'
+      //CLog::Log(LOGINFO, StringUtils::Format("ToString {} GetLanguageCode {} GetRegionLocale {}", dmc1, dmc2, dmc3));
+      ////std::string dmc4 = g_langInfo.GetEnglishLanguageName(dmc2);
+      //std::string dmc4;
+      //g_LangCodeExpander.ConvertToISO6391(dmc2, dmc4);  //3 character language in, 2 character language out
+      ////std::string dmc5 = g_langInfo.GetEnglishLanguageName(dmc4);  
+      //std::string dmc5;
+      //g_LangCodeExpander.Lookup(dmc2, dmc5);
+      //CLog::Log(LOGINFO, StringUtils::Format("ConvertToISO6391 {} Lookup {}" , dmc4, dmc5));
+      //std::string dmc6;
+      //g_LangCodeExpander.LookupISO31661(dmc3, dmc6);
+      //CLog::Log(LOGINFO, StringUtils::Format("LookupISO31661A2Name {}", dmc6));
+
+      //std::string dmc7;
+      //g_LangCodeExpander.LookupISO31661(dmc3, dmc7, true);
+      
+      //CLog::Log(LOGINFO, StringUtils::Format("{} / {}", dmc5, dmc6));
+      //CLog::Log(LOGINFO, StringUtils::Format("{} / {}", dmc4, dmc3));
+      //CLog::Log(LOGINFO, StringUtils::Format("{} / {}", dmc2, dmc7));
+
+      //std::string dmc8;
+      //g_LangCodeExpander.LookupISO31661("new zealand", dmc8);
+      //std::string dmc9;
+      //g_LangCodeExpander.LookupISO31661("New Zealand", dmc9, true);
+      //CLog::Log(LOGINFO, StringUtils::Format("{} _ {}", dmc8, dmc9));
+      
       switch (format)
       {
       case CLangCodeExpander::ENGLISH_NAME:
@@ -198,32 +236,64 @@ namespace XBMCAddon
         }
       case CLangCodeExpander::ISO_639_1:
         {
-          std::string langCode;
-          g_LangCodeExpander.ConvertToISO6391(lang, langCode);
+          //std::string langCode;
+          //g_LangCodeExpander.ConvertToISO6391(lang, langCode);
+          //if (region)
+          //{
+          //  std::string region = g_langInfo.GetRegionLocale();
+          //  std::string region2Code;
+          //  g_LangCodeExpander.ConvertToISO6391(region, region2Code);
+          //  region2Code = "-" + region2Code;
+          //  return (langCode += region2Code);
+          //}
+          //return langCode;
           if (region)
           {
-            std::string region = g_langInfo.GetRegionLocale();
-            std::string region2Code;
-            g_LangCodeExpander.ConvertToISO6391(region, region2Code);
-            region2Code = "-" + region2Code;
-            return (langCode += region2Code);
+            return (StringUtils::Format("{}-{}",
+                    g_langInfo.GetLanguageISO6391(),
+                    g_langInfo.GetCurrentRegionISO31661Alpha2()));
           }
-          return langCode;
+          else
+          {
+            return g_langInfo.GetLanguageISO6391();
+          }
         }
       case CLangCodeExpander::ISO_639_2:
         {
-          std::string langCode;
-          g_LangCodeExpander.ConvertToISO6392B(lang, langCode);
+          //std::string langCode;
+          //g_LangCodeExpander.ConvertToISO6392B(lang, langCode);
+          //if (region)
+          //{
+          //  std::string region = g_langInfo.GetRegionLocale();
+          //  std::string region3Code;
+          //  g_LangCodeExpander.ConvertToISO6392B(region, region3Code);
+          //  region3Code = "-" + region3Code;
+          //  return (langCode += region3Code);
+          //}
+          //return langCode;
           if (region)
           {
-            std::string region = g_langInfo.GetRegionLocale();
-            std::string region3Code;
-            g_LangCodeExpander.ConvertToISO6392B(region, region3Code);
-            region3Code = "-" + region3Code;
-            return (langCode += region3Code);
+            return (StringUtils::Format("{}-{}",
+                    g_langInfo.GetLanguageISO6392(),
+                    g_langInfo.GetCurrentRegionISO31661Alpha3()));
           }
-
-          return langCode;
+          else
+          {
+            return g_langInfo.GetLanguageISO6392();
+          }
+        }
+      case CLangCodeExpander::ISO_NAME:
+        {
+          if (region)
+          {
+            return (StringUtils::Format("{}-{}",
+                    g_langInfo.GetLanguageISOEnglishName(),
+                    g_langInfo.GetCurrentRegionISO31661EnglishName()));
+          }
+          else
+          {
+            return g_langInfo.GetLanguageISOEnglishName();
+          }
         }
       default:
         return "";
@@ -594,6 +664,7 @@ namespace XBMCAddon
     int getISO_639_1() { return CLangCodeExpander::ISO_639_1; }
     int getISO_639_2(){ return CLangCodeExpander::ISO_639_2; }
     int getENGLISH_NAME() { return CLangCodeExpander::ENGLISH_NAME; }
+    int getISO_NAME() { return CLangCodeExpander::ISO_NAME; }
 
     const int lLOGDEBUG = LOGDEBUG;
   }

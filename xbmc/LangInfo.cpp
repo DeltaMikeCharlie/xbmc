@@ -230,7 +230,7 @@ void CLangInfo::CRegion::SetGlobalLocale()
 #else
     strLocale = m_strLangLocaleName + "_" + m_strRegionLocaleName;
 #endif
-#ifdef TARGET_POSIX
+#ifdef TARGET_POSIXm_strRegionLocaleName
     strLocale += ".UTF-8";
 #endif
   }
@@ -419,8 +419,14 @@ bool CLangInfo::Load(const std::string& strLanguage)
     return false;
   }
 
+  //Load in the 'Language' information
+  //Read the locale from the language node.
+  //This variable is potentially overwritten at a later stage
   if (pRootElement->Attribute("locale"))
+  {
     m_defaultRegion.m_strLangLocaleName = pRootElement->Attribute("locale");
+    m_strLanguageConfigCode = m_defaultRegion.m_strLangLocaleName; //Save the language code from the config file
+  }
 
 #ifdef TARGET_WINDOWS
   // Windows need 3 chars isolang code
@@ -433,6 +439,7 @@ bool CLangInfo::Load(const std::string& strLanguage)
   if (!g_LangCodeExpander.ConvertWindowsLanguageCodeToISO6392B(m_defaultRegion.m_strLangLocaleName, m_languageCodeGeneral))
     m_languageCodeGeneral = "";
 #else
+  //If the language code is not 3 char, 'de' vs 'deu', then try to find the correct 3 char code
   if (m_defaultRegion.m_strLangLocaleName.length() != 3)
   {
     if (!g_LangCodeExpander.ConvertToISO6392B(m_defaultRegion.m_strLangLocaleName, m_languageCodeGeneral))
@@ -442,6 +449,17 @@ bool CLangInfo::Load(const std::string& strLanguage)
     m_languageCodeGeneral = m_defaultRegion.m_strLangLocaleName;
 #endif
 
+  m_strLanguageISO6392 = m_languageCodeGeneral; //This should contain the ISO-639-2 (3 char) code
+  //Try to find the 2 char code.  'fra'/'fre' -> 'fr' if one exists
+  if(!g_LangCodeExpander.ConvertToISO6391(m_strLanguageISO6392, m_strLanguageISO6391))
+  {
+    //If we can't find a ISO-639-1 (2 char), save the ISO-639-2 (3 char).
+    m_strLanguageISO6391 = m_strLanguageISO6392;
+  }
+  //Save the ISO name of the language.  'deu'/'ger' -> 'German'
+  g_LangCodeExpander.Lookup(m_strLanguageISO6392 , m_strlanguageISOEnglishName);
+
+  //Load in the 'Region' information
   std::string tmp;
   if (g_LangCodeExpander.ConvertToISO6391(m_defaultRegion.m_strLangLocaleName, tmp))
     m_defaultRegion.m_strLangLocaleCodeTwoChar = tmp;
@@ -457,8 +475,19 @@ bool CLangInfo::Load(const std::string& strLanguage)
       if (region.m_strName.empty())
         region.m_strName=g_localizeStrings.Get(10005); // Not available
 
+      //This is actually the ISO-3166-1 Alpha-2 country code
       if (pRegion->Attribute("locale"))
+      {
         region.m_strRegionLocaleName = pRegion->Attribute("locale");
+        //Save the ISO 3166-1 Alpha-2 from the langinfo.xml file
+        //and get the ISO 3166-1 Alpha-3 and English name for this country.
+        region.m_strRegionISO31661Alpha2 = region.m_strRegionLocaleName;
+        g_LangCodeExpander.LookupISO31661(region.m_strRegionISO31661Alpha2,
+                                          region.m_strRegionISO31661Alpha3, true);
+        g_LangCodeExpander.LookupISO31661(region.m_strRegionISO31661Alpha2,
+                                          region.m_strRegionISO31661EnglishName, false);
+      }
+
 
 #ifdef TARGET_WINDOWS
       // Windows need 3 chars regions code
@@ -533,6 +562,27 @@ bool CLangInfo::Load(const std::string& strLanguage)
     SetCurrentRegion(strName);
   }
   g_charsetConverter.reinitCharsetsFromSettings();
+
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load '{}' '{}'", strLanguage, strFileName));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load m_languageCodeGeneral '{}'", m_languageCodeGeneral));
+
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load m_strLanguageConfigCode '{}'", m_strLanguageConfigCode));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load m_strLanguageISO6391 '{}'", m_strLanguageISO6391));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load m_strLanguageISO6392 '{}'", m_strLanguageISO6392));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load m_strlanguageISOEnglishName '{}'", m_strlanguageISOEnglishName));
+
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load GetLanguageConfigCode() '{}'", GetLanguageConfigCode()));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load GetLanguageISO6391() '{}'", GetLanguageISO6391()));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load GetLanguageISO6392() '{}'", GetLanguageISO6392()));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load GetLanguageISOEnglishName() '{}'", GetLanguageISOEnglishName()));
+
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load m_defaultRegion.m_strLangLocaleName '{}'", m_defaultRegion.m_strLangLocaleName));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load m_defaultRegion.m_strLangLocaleCodeTwoChar '{}'", m_defaultRegion.m_strLangLocaleCodeTwoChar));
+
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load GetCurrentRegion() '{}'", GetCurrentRegion()));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load GetCurrentRegionISO31661Alpha2() '{}'", GetCurrentRegionISO31661Alpha2()));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load GetCurrentRegionISO31661Alpha3() '{}'", GetCurrentRegionISO31661Alpha3()));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::Load GetCurrentRegionISO31661EnglishName() '{}'", GetCurrentRegionISO31661EnglishName()));
 
   return true;
 }
@@ -1033,12 +1083,41 @@ void CLangInfo::SetCurrentRegion(const std::string& strName)
     SetTemperatureUnit(m_currentRegion->m_tempUnit);
   if (settings->GetString(CSettings::SETTING_LOCALE_SPEEDUNIT) == SETTING_REGIONAL_DEFAULT)
     SetSpeedUnit(m_currentRegion->m_speedUnit);
+
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion strName '{}'", strName));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_strLangLocaleName '{}'", m_currentRegion->m_strLangLocaleName));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_strLangLocaleCodeTwoChar '{}'", m_currentRegion->m_strLangLocaleCodeTwoChar));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_strRegionLocaleName '{}'", m_currentRegion->m_strRegionLocaleName));
+
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_strDateFormatShort '{}'", m_currentRegion->m_strDateFormatShort));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_strDateFormatLong '{}'", m_currentRegion->m_strDateFormatLong));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_strTimeFormat '{}'", m_currentRegion->m_strTimeFormat));
+
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_defaultRegion.m_strRegionISO31661Alpha2 '{}'", m_currentRegion->m_strRegionISO31661Alpha2));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_defaultRegion.m_strRegionISO31661Alpha3 '{}'", m_currentRegion->m_strRegionISO31661Alpha3));
+  CLog::Log(LOGINFO, StringUtils::Format("CLangInfo::SetCurrentRegion m_defaultRegion.m_strRegionISO31661EnglishName '{}'", m_currentRegion->m_strRegionISO31661EnglishName));
+
 }
 
 // Returns the current region set for this language
 const std::string& CLangInfo::GetCurrentRegion() const
 {
   return m_currentRegion->m_strName;
+}
+
+const std::string& CLangInfo::GetCurrentRegionISO31661Alpha2() const
+{
+  return m_currentRegion->m_strRegionISO31661Alpha2;
+}
+
+const std::string& CLangInfo::GetCurrentRegionISO31661Alpha3() const
+{
+  return m_currentRegion->m_strRegionISO31661Alpha3;
+}
+
+const std::string& CLangInfo::GetCurrentRegionISO31661EnglishName() const
+{
+  return m_currentRegion->m_strRegionISO31661EnglishName;
 }
 
 CTemperature::Unit CLangInfo::GetTemperatureUnit() const
